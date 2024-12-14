@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Веб-карта с выбором слоя</title>
+    <title>Tanlangan obyektlarni eksport qiluvchi web xarita</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         #map {
@@ -21,23 +21,23 @@
 </head>
 <body>
     <div id="selectedFeatures" style="margin: 10px; padding: 10px; border: 1px solid #ccc;">
-        <h3>Выбранные объекты</h3>
+        <h3>Tanlangan obyektlar</h3>
         <ul id="featureList">
-            <li>Пока ничего не выбрано</li>
+            <li>Hozircha hechnarsa tanlanmadi!</li>
         </ul>
     </div>
 
 
     <div id="controls">
-        <label for="fileInput">Загрузите GeoJSON файл:</label>
+        <label for="fileInput">GeoJSON faylni yuklang:</label>
         <input type="file" id="fileInput" accept=".geojson,.json" />
         <br>
-        <label for="layerSelector">Выберите слой:</label>
+        <label for="layerSelector">Qatlam tanlash:</label>
         <select id="layerSelector">
-            <option value="" disabled selected>Нет доступных слоев</option>
+            <option value="" disabled selected>Qatlam kiritilmagan</option>
         </select>
-        <button id="selectLayerButton">Выбрать слой</button>
-        <button id="exportButton">Экспортировать</button>
+        <button id="selectLayerButton">Qatlam tanlash</button>
+        <button id="exportButton">Saqlash</button>
     </div>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
