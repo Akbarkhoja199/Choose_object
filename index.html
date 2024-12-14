@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Веб-карта с выбором слоя</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 80vh;
+            width: 100%;
+        }
+        #controls {
+            margin: 10px;
+            text-align: center;
+        }
+        #controls label, #controls select, #controls button {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="selectedFeatures" style="margin: 10px; padding: 10px; border: 1px solid #ccc;">
+        <h3>Выбранные объекты</h3>
+        <ul id="featureList">
+            <li>Пока ничего не выбрано</li>
+        </ul>
+    </div>
+
+
+    <div id="controls">
+        <label for="fileInput">Загрузите GeoJSON файл:</label>
+        <input type="file" id="fileInput" accept=".geojson,.json" />
+        <br>
+        <label for="layerSelector">Выберите слой:</label>
+        <select id="layerSelector">
+            <option value="" disabled selected>Нет доступных слоев</option>
+        </select>
+        <button id="selectLayerButton">Выбрать слой</button>
+        <button id="exportButton">Экспортировать</button>
+    </div>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // Инициализация карты
+        var map = L.map('map').setView([41.2995, 69.2401], 10);
+
+        // Тайловые слои
+        var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        var esriSatelliteLayer = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Imagery © <a href="https://www.esri.com/">Esri</a>'
+        });
+
+        // Контроль слоев
+        var baseMaps = {
+            "OpenStreetMap": osmLayer,
+            "ESRI Satellite": esriSatelliteLayer
+        };
+        L.control.layers(baseMaps).addTo(map);
+
+        // Хранение слоев
+        var layers = {};
+        var highlightedLayer = null;
+
+        // Массив для хранения выделенных полигонов
+        var selectedPolygons = [];
+
+        // Загрузка GeoJSON файла
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            if (file) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        var geojson = JSON.parse(e.target.result);
+
+                        // Добавление GeoJSON слоя
+                        var geojsonLayer = L.geoJSON(geojson, {
+                            onEachFeature: function(feature, layer) {
+                                // Добавляем обработчик клика для каждого полигона
+                                layer.on('click', function() {
+                                    // Проверяем, выделен ли полигон уже
+                                    if (selectedPolygons.includes(layer)) {
+                                        // Снимаем выделение
+                                        geojsonLayer.resetStyle(layer);
+                                        selectedPolygons = selectedPolygons.filter(
+                                            (selectedLayer) => selectedLayer !== layer
+                                        );
+                                    } else {
+                                        // Выделяем полигон
+                                        selectedPolygons.push(layer);
+                                        layer.setStyle({
+                                            color: 'yellow',
+                                            weight: 3
+                                        });
+                                    }
+
+                                    // Отображение информации о всех выбранных полигонах
+                                    var featureList = document.getElementById('featureList');
+                                    featureList.innerHTML = selectedPolygons
+                                        .map((polygon, index) => {
+                                            const id = polygon.feature.properties.id || `Без ID ${index + 1}`;
+                                            return `<li>Выбрана геометрия с ID: ${id}</li>`;
+                                        })
+                                        .join('');
+                                });
+                            },
+                            style: {
+                                color: 'blue',
+                                weight: 1
+                            }
+                        }).addTo(map);
+
+                        // Добавление слоя в список
+                        var layerName = file.name.split('.').slice(0, -1).join('.');
+                        layers[layerName] = geojsonLayer;
+
+                        // Обновление выпадающего списка
+                        var layerSelector = document.getElementById('layerSelector');
+                        var option = document.createElement('option');
+                        option.value = layerName;
+                        option.textContent = layerName;
+                        layerSelector.appendChild(option);
+
+                        map.fitBounds(geojsonLayer.getBounds());
+                    } catch (error) {
+                        alert("Ошибка загрузки GeoJSON файла: " + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+
+        // Экспорт только выбранных объектов
+        document.getElementById('exportButton').addEventListener('click', function() {
+            var layerSelector = document.getElementById('layerSelector');
+            var selectedLayerNames = Array.from(layerSelector.selectedOptions).map(option => option.value);
+
+            if (selectedLayerNames.length === 0) {
+                alert("Выберите хотя бы один слой для экспорта.");
+                return;
+            }
+
+            // Создаем объект для всех выбранных слоев
+            var geojsonExport = {
+                type: "FeatureCollection",
+                features: []
+            };
+
+            selectedLayerNames.forEach(function(layerName) {
+                // Убедитесь, что layers существует и содержит слой с данным именем
+                if (layers && layers[layerName]) {
+                    var layer = layers[layerName];  // Получаем слой по имени из коллекции layers
+                    var selectedFeatures = selectedPolygons;  // Используем массив, который хранит выбранные объекты
+
+                    if (selectedFeatures && selectedFeatures.length > 0) {
+                        selectedFeatures.forEach(function(featureLayer) {
+                            // Проверяем, что featureLayer существует и поддерживает метод toGeoJSON
+                            if (featureLayer && featureLayer.toGeoJSON) {
+                                var geojson = featureLayer.toGeoJSON();
+                                geojsonExport.features.push(featureLayer.toGeoJSON());
+                            } else {
+                                console.error("featureLayer не найден или не поддерживает метод toGeoJSON.");
+                            }
+                        });
+                    } else {
+                        console.error("Нет выбранных объектов.");
+                    }
+                } else {
+                    console.error("Слой не найден: " + layerName);
+                }
+            });
+
+            // Проверяем, есть ли выбранные объекты для экспорта
+            if (geojsonExport.features.length === 0) {
+                alert("Нет выбранных объектов для экспорта.");
+                return;
+            }
+
+            // Скачивание файла
+            var geojsonStr = JSON.stringify(geojsonExport);
+            var blob = new Blob([geojsonStr], { type: "application/json" });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = "exported_selected_objects.geojson";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+
+
+
+
+    </script>
+</body>
+</html>
